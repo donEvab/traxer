@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Traxer</title>
+    <link rel="icon" href="assets/traxer.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="assets/traxer-180.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Personal tracker</p>
+          <h1>Traxer</h1>
+        </div>
+        <div class="date-picker">
+          <label for="entryDate">Tanggal</label>
+          <input id="entryDate" type="date" />
+        </div>
+      </section>
+
+      <section class="layout-grid">
+        <form id="dailyForm" class="panel tracker-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Daily Check-in</h2>
+              <p>Checklist hari ini, angka mingguan dihitung otomatis.</p>
+            </div>
+            <button class="icon-button" type="button" id="resetDay" title="Kosongkan hari ini" aria-label="Kosongkan hari ini">
+              <span aria-hidden="true">&#8634;</span>
+            </button>
+          </div>
+
+          <div class="field-row">
+            <label for="weight">Berat badan</label>
+            <div class="input-unit">
+              <input id="weight" name="weight" type="number" step="0.1" min="1" placeholder="50.0" />
+              <span>kg</span>
+            </div>
+          </div>
+
+          <div class="daily-plan-heading">
+            <div>
+              <span id="selectedDayName">Hari ini</span>
+              <strong id="selectedDayFocus">Daily plan</strong>
+            </div>
+            <small id="selectedDayProgress">0/0 done</small>
+          </div>
+
+          <div id="dailyTasks" class="checklist">
+          </div>
+
+          <div class="money-grid">
+            <div class="field-row">
+              <label for="tradingPnl">Trading P/L</label>
+              <div class="input-unit">
+                <span>$</span>
+                <input id="tradingPnl" name="tradingPnl" type="number" step="0.01" placeholder="5.00" />
+              </div>
+            </div>
+            <div class="field-row">
+              <label for="savings">Savings +</label>
+              <div class="input-unit">
+                <span>Rp</span>
+                <input id="savings" name="savings" type="number" step="1000" placeholder="50000" />
+              </div>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label for="notes">Catatan singkat</label>
+            <textarea id="notes" name="notes" rows="3" placeholder="Opsional"></textarea>
+          </div>
+
+          <div class="actions">
+            <button class="primary" type="submit">Simpan</button>
+            <button type="button" id="syncSheet">Kirim ke Sheets</button>
+          </div>
+        </form>
+
+        <aside class="panel summary-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Week <span id="weekNumber">1</span></h2>
+              <p id="weekRange">-</p>
+            </div>
+            <span id="verdictBadge" class="verdict">-</span>
+          </div>
+
+          <div class="metric-grid">
+            <div class="metric">
+              <span>Current Weight</span>
+              <strong id="currentWeight">-</strong>
+            </div>
+            <div class="metric">
+              <span>Total Weight Gain</span>
+              <strong id="weightGain">-</strong>
+            </div>
+            <div class="metric">
+              <span>Workout</span>
+              <strong id="workoutScore">0/4</strong>
+            </div>
+            <div class="metric">
+              <span>Protein</span>
+              <strong id="proteinScore">0/7</strong>
+            </div>
+            <div class="metric">
+              <span>Roadmap</span>
+              <strong id="roadmapScore">0/7</strong>
+            </div>
+            <div class="metric">
+              <span>Overall</span>
+              <strong id="overallScore">0%</strong>
+            </div>
+          </div>
+
+          <div class="export-box">
+            <button type="button" id="copyWeekly">Copy Weekly Row</button>
+            <button type="button" id="downloadCsv">Download CSV</button>
+          </div>
+        </aside>
+      </section>
+
+      <section class="panel week-plan-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>This Week</h2>
+            <p>Checklist per hari yang repeat tiap minggu dan masuk ke weekly score.</p>
+          </div>
+        </div>
+        <div id="weekPlan" class="week-plan"></div>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Spreadsheet Preview</h2>
+            <p>Format kolom mengikuti screenshot lo.</p>
+          </div>
+          <button type="button" id="clearAll">Clear Data</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Week</th>
+                <th>Weight (Kg)</th>
+                <th>&Delta; Weight (Kg)</th>
+                <th>Workout Done</th>
+                <th>Protein Days</th>
+                <th>Roadmap Progress</th>
+                <th>Trading P/L</th>
+                <th>Savings +</th>
+                <th>Total Savings</th>
+                <th>Equity</th>
+              </tr>
+            </thead>
+            <tbody id="weeklyRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel settings-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Targets</h2>
+            <p>Start weight dan savings target buat hitungan weekly.</p>
+          </div>
+          <button type="button" id="editSettings">Edit</button>
+        </div>
+        <div class="settings-grid">
+          <label>
+            Start weight
+            <input id="startWeight" type="number" step="0.1" placeholder="50.0" disabled />
+          </label>
+          <label>
+            Savings target
+            <input id="savingsTarget" type="number" step="100000" value="10000000" disabled />
+          </label>
+          <button class="primary" type="button" id="saveSettings" disabled>Save</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
