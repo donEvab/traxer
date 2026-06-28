@@ -18,6 +18,7 @@ const els = {
   selectedDayFocus: document.querySelector("#selectedDayFocus"),
   selectedDayProgress: document.querySelector("#selectedDayProgress"),
   startWeight: document.querySelector("#startWeight"),
+  savings: document.querySelector("#savings"),
   savingsTarget: document.querySelector("#savingsTarget"),
   toast: document.querySelector("#toast"),
   weeklyRows: document.querySelector("#weeklyRows"),
@@ -296,6 +297,21 @@ function setSettingsEditable(enabled) {
   els.editSettings.textContent = enabled ? "Cancel" : "Edit";
 }
 
+function saveCurrentEntry() {
+  const entry = getEntryForForm();
+  entries[entry.date] = entry;
+  saveJson(STORAGE_KEY, entries);
+  return entry;
+}
+
+function adjustSavings(amount) {
+  const current = Number(els.savings.value || 0);
+  const next = current + amount;
+  els.savings.value = Number.isInteger(next) ? String(next) : next.toFixed(2);
+  saveCurrentEntry();
+  render();
+}
+
 function saveSettings() {
   settings = {
     sheetWebhook: DEFAULT_SHEET_WEBHOOK,
@@ -553,17 +569,19 @@ els.editSettings.addEventListener("click", () => {
 els.saveSettings.addEventListener("click", saveSettings);
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
-  const entry = getEntryForForm();
-  entries[entry.date] = entry;
-  saveJson(STORAGE_KEY, entries);
+  saveCurrentEntry();
   render();
   showToast("Check-in tersimpan.");
 });
 
+els.form.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-savings-adjust]");
+  if (!button) return;
+  adjustSavings(Number(button.dataset.savingsAdjust || 0));
+});
+
 els.dailyTasks.addEventListener("change", () => {
-  const entry = getEntryForForm();
-  entries[entry.date] = entry;
-  saveJson(STORAGE_KEY, entries);
+  saveCurrentEntry();
   render();
 });
 
