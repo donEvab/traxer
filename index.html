@@ -62,9 +62,13 @@
             </div>
             <div class="field-row">
               <label for="savings">Savings +</label>
-              <div class="input-unit">
-                <span>Rp</span>
-                <input id="savings" name="savings" type="number" step="1000" placeholder="50000" />
+              <div class="stepper-unit" data-stepper="savings">
+                <button class="stepper-button" type="button" data-savings-adjust="-50000" aria-label="Kurangi savings Rp50.000">-</button>
+                <div class="input-unit">
+                  <span>Rp</span>
+                  <input id="savings" name="savings" type="number" step="1000" placeholder="50000" />
+                </div>
+                <button class="stepper-button" type="button" data-savings-adjust="50000" aria-label="Tambah savings Rp50.000">+</button>
               </div>
             </div>
           </div>

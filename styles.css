@@ -305,6 +305,25 @@ textarea::placeholder {
   box-shadow: none;
 }
 
+.stepper-unit {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.stepper-unit .input-unit {
+  min-width: 0;
+}
+
+.stepper-button {
+  min-height: 42px;
+  padding: 0;
+  font-size: 1.1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .daily-plan-heading {
   display: flex;
   align-items: end;
