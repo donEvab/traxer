@@ -1,0 +1,28 @@
+{
+  "name": "Traxer",
+  "short_name": "Traxer",
+  "description": "Personal tracking app for daily check-ins, goals, database sync, and weekly visualisation.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f7faf6",
+  "theme_color": "#123d2a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/traxer-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/traxer-256.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/traxer-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -2,10 +2,14 @@ const STORAGE_KEY = "traxer.entries.v1";
 const SETTINGS_KEY = "traxer.settings.v1";
 const THEME_KEY = "traxer.theme.v1";
 const DEFAULT_SHEET_WEBHOOK = "https://script.google.com/macros/s/AKfycbzsOd1B7x9opDV97-S5sCsOjiMrgARvQBs6ThdUoj9_VzY-RorZUJL1RU7pKbTi9H77UA/exec";
+const DEFAULT_SPREADSHEET_ID = "1JCDZSb6CHWDTd8Re4R_uULNWJG88ck0DwcLK1JFqYAg";
 
 const els = {
   form: document.querySelector("#dailyForm"),
   entryDate: document.querySelector("#entryDate"),
+  appViews: document.querySelectorAll("[data-view]"),
+  viewButtons: document.querySelectorAll("[data-view-target]"),
+  installApp: document.querySelector("#installApp"),
   resetDay: document.querySelector("#resetDay"),
   clearAll: document.querySelector("#clearAll"),
   copyWeekly: document.querySelector("#copyWeekly"),
@@ -21,6 +25,16 @@ const els = {
   startWeight: document.querySelector("#startWeight"),
   savings: document.querySelector("#savings"),
   savingsTarget: document.querySelector("#savingsTarget"),
+  weeklyWorkoutTarget: document.querySelector("#weeklyWorkoutTarget"),
+  weeklyProteinTarget: document.querySelector("#weeklyProteinTarget"),
+  weeklyRoadmapTarget: document.querySelector("#weeklyRoadmapTarget"),
+  spreadsheetId: document.querySelector("#spreadsheetId"),
+  sheetWebhook: document.querySelector("#sheetWebhook"),
+  saveDatabaseSettings: document.querySelector("#saveDatabaseSettings"),
+  resetDatabaseSettings: document.querySelector("#resetDatabaseSettings"),
+  openDatabase: document.querySelector("#openDatabase"),
+  databaseLink: document.querySelector("#databaseLink"),
+  databaseStatus: document.querySelector("#databaseStatus"),
   themeToggle: document.querySelector("#themeToggle"),
   edgeNav: document.querySelector(".edge-nav"),
   toast: document.querySelector("#toast"),
@@ -34,11 +48,16 @@ const els = {
   proteinScore: document.querySelector("#proteinScore"),
   roadmapScore: document.querySelector("#roadmapScore"),
   overallScore: document.querySelector("#overallScore"),
+  weightChart: document.querySelector("#weightChart"),
+  savingsChart: document.querySelector("#savingsChart"),
+  habitChart: document.querySelector("#habitChart"),
+  overallChart: document.querySelector("#overallChart"),
 };
 
 const cursorState = { x: window.innerWidth / 2, y: window.innerHeight * 0.3, frame: 0 };
 let settingsEditable = false;
 let revealObserver;
+let deferredInstallPrompt = null;
 
 const WEEKLY_PLAN = [
   {
@@ -115,16 +134,16 @@ const WEEKLY_PLAN = [
 ];
 
 let entries = loadJson(STORAGE_KEY, {});
-let settings = loadJson(SETTINGS_KEY, {
+let settings = {
+  spreadsheetId: DEFAULT_SPREADSHEET_ID,
   sheetWebhook: DEFAULT_SHEET_WEBHOOK,
   startWeight: "",
   savingsTarget: 10000000,
-});
-
-if (!settings.sheetWebhook || settings.sheetWebhook !== DEFAULT_SHEET_WEBHOOK) {
-  settings.sheetWebhook = DEFAULT_SHEET_WEBHOOK;
-  saveJson(SETTINGS_KEY, settings);
-}
+  weeklyWorkoutTarget: 4,
+  weeklyProteinTarget: 7,
+  weeklyRoadmapTarget: 7,
+  ...loadJson(SETTINGS_KEY, {}),
+};
 
 function loadJson(key, fallback) {
   try {
@@ -136,6 +155,20 @@ function loadJson(key, fallback) {
 
 function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function numberSetting(key, fallback) {
+  const value = Number(settings[key]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function databaseUrl() {
+  const id = String(settings.spreadsheetId || DEFAULT_SPREADSHEET_ID).trim();
+  return `https://docs.google.com/spreadsheets/d/${id}/edit`;
+}
+
+function persistSettings() {
+  saveJson(SETTINGS_KEY, settings);
 }
 
 function currentTheme() {
@@ -310,6 +343,9 @@ function fillForm(entry = {}) {
 function fillSettings() {
   els.startWeight.value = settings.startWeight || "";
   els.savingsTarget.value = settings.savingsTarget || 10000000;
+  els.weeklyWorkoutTarget.value = numberSetting("weeklyWorkoutTarget", 4);
+  els.weeklyProteinTarget.value = numberSetting("weeklyProteinTarget", 7);
+  els.weeklyRoadmapTarget.value = numberSetting("weeklyRoadmapTarget", 7);
   setSettingsEditable(false);
 }
 
@@ -317,6 +353,9 @@ function setSettingsEditable(enabled) {
   settingsEditable = enabled;
   els.startWeight.disabled = !enabled;
   els.savingsTarget.disabled = !enabled;
+  els.weeklyWorkoutTarget.disabled = !enabled;
+  els.weeklyProteinTarget.disabled = !enabled;
+  els.weeklyRoadmapTarget.disabled = !enabled;
   els.saveSettings.disabled = !enabled;
   els.editSettings.textContent = enabled ? "Cancel" : "Edit";
 }
@@ -338,14 +377,55 @@ function adjustSavings(amount) {
 
 function saveSettings() {
   settings = {
-    sheetWebhook: DEFAULT_SHEET_WEBHOOK,
+    ...settings,
     startWeight: els.startWeight.value,
     savingsTarget: Number(els.savingsTarget.value || 10000000),
+    weeklyWorkoutTarget: Number(els.weeklyWorkoutTarget.value || 4),
+    weeklyProteinTarget: Number(els.weeklyProteinTarget.value || 7),
+    weeklyRoadmapTarget: Number(els.weeklyRoadmapTarget.value || 7),
   };
-  saveJson(SETTINGS_KEY, settings);
+  persistSettings();
   setSettingsEditable(false);
   render();
   showToast("Targets tersimpan.");
+}
+
+function fillDatabaseSettings() {
+  els.spreadsheetId.value = settings.spreadsheetId || DEFAULT_SPREADSHEET_ID;
+  els.sheetWebhook.value = settings.sheetWebhook || DEFAULT_SHEET_WEBHOOK;
+  updateDatabaseUi();
+}
+
+function saveDatabaseSettings() {
+  settings = {
+    ...settings,
+    spreadsheetId: els.spreadsheetId.value.trim() || DEFAULT_SPREADSHEET_ID,
+    sheetWebhook: els.sheetWebhook.value.trim() || DEFAULT_SHEET_WEBHOOK,
+  };
+  persistSettings();
+  updateDatabaseUi();
+  showToast("Database settings tersimpan.");
+}
+
+function resetDatabaseSettings() {
+  settings = {
+    ...settings,
+    spreadsheetId: DEFAULT_SPREADSHEET_ID,
+    sheetWebhook: DEFAULT_SHEET_WEBHOOK,
+  };
+  persistSettings();
+  fillDatabaseSettings();
+  showToast("Database settings direset.");
+}
+
+function updateDatabaseUi() {
+  const url = databaseUrl();
+  if (els.databaseLink) els.databaseLink.href = url;
+  if (els.databaseStatus) {
+    els.databaseStatus.textContent = settings.sheetWebhook
+      ? "Database connected. Sync manual aktif via Apps Script."
+      : "Apps Script URL kosong. Data masih tersimpan lokal.";
+  }
 }
 
 function weeklySummaries() {
@@ -362,6 +442,9 @@ function weeklySummaries() {
   let runningSavings = 0;
   let runningPnl = 0;
   let previousWeight = numberOrNull(settings.startWeight);
+  const workoutTarget = numberSetting("weeklyWorkoutTarget", 4);
+  const proteinTarget = numberSetting("weeklyProteinTarget", 7);
+  const roadmapTarget = numberSetting("weeklyRoadmapTarget", 7);
 
   return Array.from(grouped.entries()).map(([weekStart, days]) => {
     const date = parseDate(weekStart);
@@ -380,9 +463,9 @@ function weeklySummaries() {
     runningSavings += savings;
     runningPnl += tradingPnl;
 
-    const workoutPct = Math.min(workout / 4, 1) * 100;
-    const proteinPct = Math.min(protein / 7, 1) * 100;
-    const roadmapPct = Math.min(roadmap / 7, 1) * 100;
+    const workoutPct = Math.min(workout / workoutTarget, 1) * 100;
+    const proteinPct = Math.min(protein / proteinTarget, 1) * 100;
+    const roadmapPct = Math.min(roadmap / roadmapTarget, 1) * 100;
     const target = Number(settings.savingsTarget || 10000000);
     const savingsPct = target > 0 ? Math.min((runningSavings / target) * 100, 100) : 0;
     const overall = Math.round((workoutPct + proteinPct + roadmapPct + savingsPct) / 4);
@@ -394,10 +477,13 @@ function weeklySummaries() {
       currentWeight,
       deltaWeight,
       workout,
+      workoutTarget,
       workoutPct,
       protein,
+      proteinTarget,
       proteinPct,
       roadmap,
+      roadmapTarget,
       roadmapPct,
       tradingPnl,
       totalPnl: runningPnl,
@@ -416,9 +502,9 @@ function weeklyLogRow(summary) {
     summary.week,
     formatKg(summary.currentWeight),
     formatKg(summary.deltaWeight, true),
-    `${summary.workout}/4`,
-    `${summary.protein}/7`,
-    `${summary.roadmap}/7`,
+    `${summary.workout}/${summary.workoutTarget}`,
+    `${summary.protein}/${summary.proteinTarget}`,
+    `${summary.roadmap}/${summary.roadmapTarget}`,
     formatUsd(summary.tradingPnl),
     formatIdr(summary.savings),
     formatIdr(summary.totalSavings),
@@ -431,11 +517,11 @@ function dashboardRow(summary) {
     summary.week,
     formatKg(summary.currentWeight),
     formatKg(summary.deltaWeight, true),
-    `${summary.workout}/4`,
+    `${summary.workout}/${summary.workoutTarget}`,
     percent(summary.workoutPct),
-    `${summary.protein}/7`,
+    `${summary.protein}/${summary.proteinTarget}`,
     percent(summary.proteinPct),
-    `${summary.roadmap}/7`,
+    `${summary.roadmap}/${summary.roadmapTarget}`,
     percent(summary.roadmapPct),
     formatUsd(summary.tradingPnl),
     formatUsd(summary.totalPnl),
@@ -467,10 +553,11 @@ function render() {
     els.verdictBadge.textContent = "-";
     els.currentWeight.textContent = "-";
     els.weightGain.textContent = "-";
-    els.workoutScore.textContent = "0/4";
-    els.proteinScore.textContent = "0/7";
-    els.roadmapScore.textContent = "0/7";
+    els.workoutScore.textContent = `0/${numberSetting("weeklyWorkoutTarget", 4)}`;
+    els.proteinScore.textContent = `0/${numberSetting("weeklyProteinTarget", 7)}`;
+    els.roadmapScore.textContent = `0/${numberSetting("weeklyRoadmapTarget", 7)}`;
     els.overallScore.textContent = "0%";
+    renderVisuals(summaries);
     refreshRevealTargets();
     return;
   }
@@ -481,10 +568,11 @@ function render() {
   els.verdictBadge.style.color = activeSummary.verdict === "GOOD" ? "var(--green)" : activeSummary.verdict === "OK" ? "var(--amber)" : "var(--red)";
   els.currentWeight.textContent = formatKg(activeSummary.currentWeight);
   els.weightGain.textContent = formatKg(activeSummary.deltaWeight, true);
-  els.workoutScore.textContent = `${activeSummary.workout}/4`;
-  els.proteinScore.textContent = `${activeSummary.protein}/7`;
-  els.roadmapScore.textContent = `${activeSummary.roadmap}/7`;
+  els.workoutScore.textContent = `${activeSummary.workout}/${activeSummary.workoutTarget}`;
+  els.proteinScore.textContent = `${activeSummary.protein}/${activeSummary.proteinTarget}`;
+  els.roadmapScore.textContent = `${activeSummary.roadmap}/${activeSummary.roadmapTarget}`;
   els.overallScore.textContent = percent(activeSummary.overall);
+  renderVisuals(summaries);
   refreshRevealTargets();
 }
 
@@ -554,10 +642,36 @@ function scrollPage(target) {
   window.scrollTo({ top, behavior: "smooth" });
 }
 
+function setActiveView(viewName) {
+  const nextView = viewName || "home";
+  els.appViews.forEach((view) => {
+    view.classList.toggle("is-active", view.dataset.view === nextView);
+  });
+  els.viewButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.viewTarget === nextView);
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  refreshRevealTargets();
+}
+
+function initNavigation() {
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-view-target]");
+    if (!button) return;
+    setActiveView(button.dataset.viewTarget);
+  });
+}
+
 function initEdgeNav() {
   if (!els.edgeNav) return;
 
   els.edgeNav.addEventListener("click", (event) => {
+    const viewButton = event.target.closest("[data-view-target]");
+    if (viewButton) {
+      setActiveView(viewButton.dataset.viewTarget);
+      return;
+    }
+
     const themeButton = event.target.closest("#themeToggle");
     if (themeButton) {
       setTheme(currentTheme() === "dark" ? "light" : "dark");
@@ -599,6 +713,99 @@ function refreshRevealTargets() {
   });
 }
 
+function initPwa() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+  }
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    if (els.installApp) els.installApp.hidden = false;
+  });
+
+  els.installApp?.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) {
+      showToast("Install lewat menu browser: Add to Home Screen.");
+      return;
+    }
+
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    els.installApp.hidden = true;
+  });
+}
+
+function renderVisuals(summaries) {
+  renderLineChart(els.weightChart, summaries, "currentWeight", formatKg);
+  renderLineChart(els.savingsChart, summaries, "totalSavings", formatIdr);
+  renderBarChart(els.habitChart, summaries, [
+    ["Workout", "workoutPct"],
+    ["Protein", "proteinPct"],
+    ["Roadmap", "roadmapPct"],
+  ]);
+  renderLineChart(els.overallChart, summaries, "overall", percent, 0, 100);
+}
+
+function chartEmpty(target) {
+  if (!target) return;
+  target.className = "chart-empty";
+  target.textContent = "Belum ada data.";
+}
+
+function renderLineChart(target, rows, key, formatter, forcedMin, forcedMax) {
+  if (!target || !rows.length) return chartEmpty(target);
+  const points = rows
+    .map((row) => ({ week: row.week, value: Number(row[key]) }))
+    .filter((point) => Number.isFinite(point.value));
+
+  if (!points.length) return chartEmpty(target);
+
+  const values = points.map((point) => point.value);
+  const min = Number.isFinite(forcedMin) ? forcedMin : Math.min(...values);
+  const max = Number.isFinite(forcedMax) ? forcedMax : Math.max(...values);
+  const range = max - min || 1;
+  const width = 520;
+  const height = 220;
+  const pad = 28;
+  const step = points.length > 1 ? (width - pad * 2) / (points.length - 1) : 0;
+  const coords = points.map((point, index) => {
+    const x = points.length > 1 ? pad + index * step : width / 2;
+    const y = height - pad - ((point.value - min) / range) * (height - pad * 2);
+    return { ...point, x, y };
+  });
+  const path = coords.map((point, index) => `${index ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+  const last = points[points.length - 1];
+
+  target.className = "chart";
+  target.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${key} chart">
+      <path class="chart-grid-line" d="M ${pad} ${height - pad} H ${width - pad}" />
+      <path class="chart-grid-line" d="M ${pad} ${pad} H ${width - pad}" />
+      <path class="chart-line" d="${path}" />
+      ${coords.map((point) => `<circle class="chart-dot" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="4" />`).join("")}
+    </svg>
+    <div class="chart-caption">Week ${last.week}: ${formatter(last.value)}</div>
+  `;
+}
+
+function renderBarChart(target, rows, series) {
+  if (!target || !rows.length) return chartEmpty(target);
+  const latest = rows[rows.length - 1];
+  target.className = "chart bar-chart";
+  target.innerHTML = series.map(([label, key]) => {
+    const value = Math.max(0, Math.min(Number(latest[key]) || 0, 100));
+    return `
+      <div class="bar-row">
+        <span>${label}</span>
+        <div class="bar-track"><i style="width:${value}%"></i></div>
+        <strong>${percent(value)}</strong>
+      </div>
+    `;
+  }).join("");
+}
+
 async function syncToSheet() {
   const sheetWebhook = settings.sheetWebhook || DEFAULT_SHEET_WEBHOOK;
   if (!sheetWebhook) {
@@ -631,9 +838,12 @@ async function syncToSheet() {
 els.entryDate.value = todayIso();
 initTheme();
 fillSettings();
+fillDatabaseSettings();
 render();
+initNavigation();
 initEdgeNav();
 initRevealMotion();
+initPwa();
 
 window.addEventListener("pointermove", updateCursorGrid, { passive: true });
 window.addEventListener("touchmove", updateCursorGrid, { passive: true });
@@ -647,6 +857,11 @@ els.editSettings.addEventListener("click", () => {
   els.startWeight.focus();
 });
 els.saveSettings.addEventListener("click", saveSettings);
+els.saveDatabaseSettings.addEventListener("click", saveDatabaseSettings);
+els.resetDatabaseSettings.addEventListener("click", resetDatabaseSettings);
+els.openDatabase.addEventListener("click", () => {
+  window.open(databaseUrl(), "_blank", "noreferrer");
+});
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
   saveCurrentEntry();
