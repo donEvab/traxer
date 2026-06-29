@@ -1,5 +1,6 @@
 const STORAGE_KEY = "traxer.entries.v1";
 const SETTINGS_KEY = "traxer.settings.v1";
+const THEME_KEY = "traxer.theme.v1";
 const DEFAULT_SHEET_WEBHOOK = "https://script.google.com/macros/s/AKfycbzsOd1B7x9opDV97-S5sCsOjiMrgARvQBs6ThdUoj9_VzY-RorZUJL1RU7pKbTi9H77UA/exec";
 
 const els = {
@@ -20,6 +21,8 @@ const els = {
   startWeight: document.querySelector("#startWeight"),
   savings: document.querySelector("#savings"),
   savingsTarget: document.querySelector("#savingsTarget"),
+  themeToggle: document.querySelector("#themeToggle"),
+  edgeNav: document.querySelector(".edge-nav"),
   toast: document.querySelector("#toast"),
   weeklyRows: document.querySelector("#weeklyRows"),
   weekNumber: document.querySelector("#weekNumber"),
@@ -35,6 +38,7 @@ const els = {
 
 const cursorState = { x: window.innerWidth / 2, y: window.innerHeight * 0.3, frame: 0 };
 let settingsEditable = false;
+let revealObserver;
 
 const WEEKLY_PLAN = [
   {
@@ -132,6 +136,26 @@ function loadJson(key, fallback) {
 
 function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function setTheme(theme) {
+  const nextTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = nextTheme;
+  localStorage.setItem(THEME_KEY, nextTheme);
+  if (els.themeToggle) {
+    els.themeToggle.textContent = nextTheme === "dark" ? "Light" : "Dark";
+    els.themeToggle.setAttribute("aria-pressed", String(nextTheme === "dark"));
+  }
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  const systemTheme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  setTheme(saved || systemTheme);
 }
 
 function todayIso() {
@@ -447,6 +471,7 @@ function render() {
     els.proteinScore.textContent = "0/7";
     els.roadmapScore.textContent = "0/7";
     els.overallScore.textContent = "0%";
+    refreshRevealTargets();
     return;
   }
 
@@ -460,6 +485,7 @@ function render() {
   els.proteinScore.textContent = `${activeSummary.protein}/7`;
   els.roadmapScore.textContent = `${activeSummary.roadmap}/7`;
   els.overallScore.textContent = percent(activeSummary.overall);
+  refreshRevealTargets();
 }
 
 function renderWeekPlan() {
@@ -484,7 +510,8 @@ function renderWeekPlan() {
         </button>
       `;
     })
-    .join("");
+    .join("")
+    .replaceAll("\u00c2\u00b7", "-");
 }
 
 function csvEscape(value) {
@@ -522,6 +549,56 @@ function updateCursorGrid(event) {
   });
 }
 
+function scrollPage(target) {
+  const top = target === "bottom" ? document.documentElement.scrollHeight : 0;
+  window.scrollTo({ top, behavior: "smooth" });
+}
+
+function initEdgeNav() {
+  if (!els.edgeNav) return;
+
+  els.edgeNav.addEventListener("click", (event) => {
+    const themeButton = event.target.closest("#themeToggle");
+    if (themeButton) {
+      setTheme(currentTheme() === "dark" ? "light" : "dark");
+      return;
+    }
+
+    const scrollButton = event.target.closest("[data-scroll-target]");
+    if (!scrollButton) return;
+    scrollPage(scrollButton.dataset.scrollTarget);
+  });
+}
+
+function initRevealMotion() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  revealObserver = new IntersectionObserver((entriesToReveal) => {
+    entriesToReveal.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("is-visible");
+      revealObserver.unobserve(entry.target);
+    });
+  }, {
+    threshold: 0.12,
+    rootMargin: "0px 0px -8% 0px",
+  });
+
+  refreshRevealTargets();
+}
+
+function refreshRevealTargets() {
+  if (!revealObserver) return;
+
+  document.querySelectorAll(".topbar, .panel, .day-card, tbody tr").forEach((target, index) => {
+    if (target.dataset.revealObserved) return;
+    target.dataset.revealObserved = "true";
+    target.classList.add("reveal");
+    target.style.transitionDelay = `${Math.min(index * 35, 280)}ms`;
+    revealObserver.observe(target);
+  });
+}
+
 async function syncToSheet() {
   const sheetWebhook = settings.sheetWebhook || DEFAULT_SHEET_WEBHOOK;
   if (!sheetWebhook) {
@@ -552,8 +629,11 @@ async function syncToSheet() {
 }
 
 els.entryDate.value = todayIso();
+initTheme();
 fillSettings();
 render();
+initEdgeNav();
+initRevealMotion();
 
 window.addEventListener("pointermove", updateCursorGrid, { passive: true });
 window.addEventListener("touchmove", updateCursorGrid, { passive: true });

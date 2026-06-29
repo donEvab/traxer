@@ -4,6 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Traxer</title>
+    <script>
+      (() => {
+        const savedTheme = localStorage.getItem("traxer.theme.v1");
+        const systemTheme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        document.documentElement.dataset.theme = savedTheme || systemTheme;
+      })();
+    </script>
     <link rel="icon" href="assets/traxer.ico" sizes="any" />
     <link rel="apple-touch-icon" href="assets/traxer-180.png" />
     <link rel="stylesheet" href="styles.css" />
@@ -187,6 +194,16 @@
         </div>
       </section>
     </main>
+
+    <nav class="edge-nav" aria-label="Quick navigation">
+      <span class="edge-nav-handle" aria-hidden="true"></span>
+      <div class="edge-nav-panel">
+        <a class="edge-nav-item" href="https://docs.google.com/spreadsheets/d/1JCDZSb6CHWDTd8Re4R_uULNWJG88ck0DwcLK1JFqYAg/edit" target="_blank" rel="noreferrer">Database</a>
+        <button class="edge-nav-item" type="button" id="themeToggle" aria-label="Ganti mode terang atau gelap">Dark</button>
+        <button class="edge-nav-item" type="button" data-scroll-target="top">Top</button>
+        <button class="edge-nav-item" type="button" data-scroll-target="bottom">End</button>
+      </div>
+    </nav>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="app.js"></script>
